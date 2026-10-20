@@ -4,7 +4,30 @@ from search_algorithms import (GameStats, TreasureState, compute_distance_matrix
     treasure_minimax, treasure_alpha_beta, solve_treasure_game, transition)
 from .cases import TREASURE, VALUES
 from .references import enumerated_game
-from .metrics import measure, game_output
+from .metrics import measure_interleaved, game_output
+
+
+def timed_game(matrix, values, depth, config, repeats):
+    expected, _ = enumerated_game(matrix, values, depth)
+    calls = {'minimax': lambda st: treasure_minimax(TreasureState(), depth, matrix, values, stats=st)}
+    for method in ('original', 'reverse', 'heuristic'):
+        calls[method] = lambda st, method=method: treasure_alpha_beta(
+            TreasureState(), depth, matrix, values, order=method, stats=st)
+    return measure_interleaved(calls, GameStats, config, repeats, game_output, expected)
+
+
+def root_responses(matrix):
+    rows=[]
+    for depth in (2,4):
+        for target in sorted(VALUES):
+            state=transition(TreasureState(),target,matrix,VALUES)
+            for reply in sorted(state.remaining):
+                child=transition(state,reply,matrix,VALUES)
+                value=treasure_minimax(child,depth-2,matrix,VALUES)['best_value']
+                expected,_=enumerated_game(matrix,VALUES,depth-2,child)
+                assert value==expected
+                rows.append({'depth':depth,'a_first':target,'b_reply':reply,'utility':value})
+    return rows
 
 
 def run(quick=False):
@@ -13,20 +36,16 @@ def run(quick=False):
     for depth in range(7):
         expected, root_values = enumerated_game(matrix, VALUES, depth)
         roots.extend({'depth': depth, 'target': target, 'value': value} for target, value in root_values.items())
-        for method in ('minimax', 'original', 'reverse', 'heuristic'):
-            call = (lambda st: treasure_minimax(TreasureState(), depth, matrix, VALUES, stats=st)) if method == 'minimax' else (
-                lambda st: treasure_alpha_beta(TreasureState(), depth, matrix, VALUES, order=method, stats=st))
-            config = {'experiment': 'treasure', 'case_id': f'treasure_{depth}', 'depth': depth, 'algorithm': method}
-            rows += measure(call, GameStats, config, 2 if quick else 30, game_output, expected)
+        rows += timed_game(matrix, VALUES, depth,
+            {'experiment': 'treasure', 'case_id': f'treasure_{depth}', 'depth': depth},
+            2 if quick else 30)
     for value in range(0, 19, 2):
         values = {**VALUES, 'T1': value}
         for depth in (2, 4):
             expected, _ = enumerated_game(matrix, values, depth)
-            for order in ('original', 'heuristic'):
-                config = {'experiment': 'sensitivity', 'case_id': f'sensitivity_{value}_{depth}',
-                          't1_value': value, 'depth': depth, 'algorithm': order}
-                sensitivity += measure(lambda st: treasure_alpha_beta(TreasureState(), depth, matrix, values,
-                    order=order, stats=st), GameStats, config, 2 if quick else 30, game_output, expected)
+            sensitivity += timed_game(matrix, values, depth,
+                {'experiment': 'sensitivity', 'case_id': f'sensitivity_{value}_{depth}',
+                 't1_value': value, 'depth': depth}, 2 if quick else 30)
     # Routing time is intentionally kept separate from game recursion time.
     times = []
     compute_distance_matrix(TREASURE)

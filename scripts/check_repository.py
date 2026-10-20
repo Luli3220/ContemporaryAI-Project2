@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ast
+import argparse
 import contextlib
 import io
 import json
@@ -16,7 +17,11 @@ sys.path.insert(0, str(ROOT))
 
 
 def main() -> None:
-    files = [p for p in ROOT.rglob('*') if p.is_file() and '.git' not in p.relative_to(ROOT).parts]
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--quick',action='store_true')
+    args=parser.parse_args()
+    files = [p for p in ROOT.rglob('*') if p.is_file() and '.git' not in p.relative_to(ROOT).parts
+             and p.relative_to(ROOT).parts[:2] != ('results','quick')]
     errors: list[str] = []
     forbidden_dirs = {'__pycache__', '.pytest_cache', 'overleaf', 'latex_qa', 'archive'}
     forbidden_suffixes = {'.tex', '.sty', '.aux', '.log', '.out', '.pyc', '.zip', '.tmp', '.bak'}
@@ -47,7 +52,7 @@ def main() -> None:
         raise SystemExit('\n'.join(errors))
     from experiments.audit_results import audit
     with contextlib.redirect_stdout(io.StringIO()):
-        audit(ROOT / 'results')
+        audit(ROOT / ('results/quick' if args.quick else 'results'))
     result = {'status': 'passed', 'files': len(files), 'python_files': python_files,
               'local_links_checked': local_links, 'temporary_or_latex_artifacts': 0,
               'experiment_audit': 'passed'}

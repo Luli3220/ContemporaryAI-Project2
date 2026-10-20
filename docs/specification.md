@@ -65,3 +65,11 @@ GameStats：visited_nodes为递归入口次数含根叶；evaluated_leaves为终
 ## 6. 交付/验收映射
 
 src/search_algorithms提供四题与指标；tests独立基准；experiments固定生成、采样、聚合、绘图、报告；results/raw保留重复测量与环境；results/tables聚合；results/figures为PNG及SVG；report/report.md为中文报告。README给每题命令、pytest -q和python -m experiments.run_all。基础代码只依赖标准库，测试pytest、图表matplotlib。理论依据引用课程PDF页码，无需网络资料。完整报告使用完整模式数据。
+
+## 7. 最终实验补充（2026-10-20）
+
+原有四题定义和公开求解接口保留。astar_search、maze_search、weighted_search新增可选tie_breaking关键字，默认f_h_fifo；f_fifo只按f和插入顺序排序。基础实验继续使用默认值，2×2消融独立记录。
+
+宝藏深度及价值敏感性改为每轮随机顺序交错计时，各方法预热2轮、正式30轮。敏感性增加反向AB与完整Minimax作为对照，其余地图、价值取值和深度不变。统计规则、同轮差值区间及稳定优势判据见final_experiment_protocol.md，覆盖前文旧的连续计时安排。
+
+最终数据统一使用run_id和文件哈希；Python3.11 CI运行完整测试、官方样例、quick实验及审计。审计同时核对源码、独立最优值、重复计数、执行顺序和原始到统计表的重算结果。

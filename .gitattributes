@@ -8,3 +8,7 @@
 *.csv -text whitespace=cr-at-eol
 *.pdf binary
 *.png binary
+# Keep frozen artifacts byte-identical across Git checkouts and operating systems.
+results/** -text whitespace=cr-at-eol
+results/**/*.svg -text whitespace=-blank-at-eol,cr-at-eol
+report/report.md -text whitespace=cr-at-eol

@@ -1,0 +1,44 @@
+name: Search algorithms validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-repro.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements-repro.txt
+      - name: Run complete test suite
+        run: python -m pytest -q -p no:cacheprovider --junitxml=results/raw/pytest.xml
+      - name: Verify all four official examples
+        run: python -m experiments.verify_official
+      - name: Reproduce quick experiments from seeds
+        run: python -m experiments.run_all --quick
+      - name: Verify quick raw data, tables, figures and source hashes
+        run: python -m experiments.audit_results --quick
+      - name: Check repository links and quick output
+        run: python scripts/check_repository.py --quick
+      - name: Save validation outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python311-validation
+          path: |
+            results/raw/pytest.xml
+            results/quick/

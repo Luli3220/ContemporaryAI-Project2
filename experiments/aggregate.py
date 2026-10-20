@@ -8,7 +8,8 @@ METRICS = ['expanded', 'generated', 'popped', 'stale_pops', 'max_frontier',
            'visited_nodes', 'evaluated_leaves', 'cutoff_events', 'pruned_siblings',
            'ordering_probes', 'runtime_ms', 'wall_ms', 'optimal_cost', 'path_steps']
 CONFIG = ['experiment', 'grid_size', 'density', 'scenario', 'high_ratio', 'branch',
-          'depth', 't1_value', 'algorithm', 'reachable']
+          'depth', 't1_value', 'algorithm', 'reachable', 'heuristic', 'tie_breaking']
+FAMILIES = ('maze', 'weighted', 'tree', 'treasure', 'sensitivity', 'maze_ablation')
 
 
 def bootstrap_ci(values):
@@ -21,7 +22,7 @@ def bootstrap_ci(values):
 
 def aggregate(root):
     all_rows, case_rows, summaries = [], [], []
-    for name in ('maze', 'weighted', 'tree', 'treasure', 'sensitivity'):
+    for name in FAMILIES:
         all_rows.extend(read_csv(root / 'raw' / f'{name}.csv'))
     groups = defaultdict(list)
     for row in all_rows:

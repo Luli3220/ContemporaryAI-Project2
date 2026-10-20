@@ -19,11 +19,12 @@ def plot_all(root):
     data = read_csv(root / 'tables' / 'summary.csv')
     cases = read_csv(root / 'tables' / 'per_case.csv')
     plt.rcParams.update({'font.family':'DejaVu Sans', 'font.size':10, 'axes.spines.top':False,
+                         'svg.hashsalt':'experiment2-final',
                          'axes.spines.right':False, 'figure.dpi':140, 'savefig.dpi':180})
 
     def save(fig, name):
         fig.savefig(out / (name + '.png'), bbox_inches='tight')
-        fig.savefig(out / (name + '.svg'), bbox_inches='tight')
+        fig.savefig(out / (name + '.svg'), bbox_inches='tight',metadata={'Date':None})
         plt.close(fig)
 
     fig, axes = plt.subplots(2, 2, figsize=(10, 7), constrained_layout=True)
@@ -132,6 +133,46 @@ def plot_all(root):
     ax.set(xlabel='Column', ylabel='Row', title='Official weighted example: seven paid cells, then free E')
     fig.colorbar(heat, ax=ax, label='Entry cost')
     save(fig, 'weighted_path')
+
+    ablation=read_csv(root/'tables/ablation_summary.csv')
+    methods=('zero__f_h_fifo','zero__f_fifo','manhattan__f_h_fifo','manhattan__f_fifo')
+    colors=('#718096','#d38b32','#176b87','#a74365')
+    fig,axes=plt.subplots(2,2,figsize=(10,7),layout='constrained')
+    for ax,density in zip(axes.flat,(0,.1,.2,.3)):
+        for method,color in zip(methods,colors):
+            rows=sorted([r for r in ablation if float(r['density'])==density and r['reachable']=='True'
+                         and r['algorithm']==method],key=lambda r:int(r['grid_size']))
+            ax.plot([int(r['grid_size']) for r in rows],[float(r['expanded_mean']) for r in rows],
+                    marker='o',linestyle='--' if method.endswith('__f_fifo') else '-',label=method.replace('__',' / '),color=color)
+        ax.set(title=f'Obstacles {density:.0%}',xlabel='Grid side (cells)',ylabel='Expanded nodes',ylim=(0,None))
+        ax.grid(alpha=.15)
+        ax.legend(fontsize=8)
+    fig.suptitle('A* 2x2 ablation: identical maps, seeds and neighbor order')
+    save(fig,'maze_ablation')
+
+    timing=read_csv(root/'tables/treasure_timing_summary.csv')
+    raw=read_csv(root/'raw/treasure.csv')
+    fig,axes=plt.subplots(1,2,figsize=(11,4),layout='constrained')
+    for method in ('original','reverse','heuristic'):
+        rows=sorted([r for r in raw if int(r['depth'])==4 and r['algorithm']==method],key=lambda r:int(r['round']))
+        axes[0].plot([int(r['round']) for r in rows],[float(r['wall_ms'])*1000 for r in rows],
+                     '.-',label=method,color=COLORS[method])
+    axes[0].set(xlabel='Interleaved round',ylabel='Wall time (us)',title='H=4, search only',ylim=(0,None))
+    axes[0].legend()
+    rows=[r for r in timing if r['experiment']=='treasure' and int(r['depth'])==4]
+    labels=[]
+    for i,r in enumerate(rows):
+        labels.append(r['candidate']+' - '+r['baseline'])
+        center=float(r['paired_median_delta_ms'])*1000
+        for offset,prefix,color,label in ((-.08,'paired','#176b87','Paired bootstrap'),(.08,'block','#d38b32','Block bootstrap')):
+            axes[1].hlines(i+offset,float(r[prefix+'_delta_ci_low'])*1000,float(r[prefix+'_delta_ci_high'])*1000,
+                          color=color,label=label if i==0 else None,linewidth=2)
+            axes[1].plot(center,i+offset,'o',color=color,markersize=4)
+    axes[1].axvline(0,color='#444',linewidth=.8)
+    axes[1].set_yticks(range(len(labels)),labels)
+    axes[1].set(xlabel='Paired median difference (us)',title='95% timing intervals; negative = faster')
+    axes[1].legend(fontsize=8)
+    save(fig,'treasure_timing')
 
 
 if __name__ == '__main__':

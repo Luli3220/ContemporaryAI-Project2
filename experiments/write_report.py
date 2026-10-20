@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 from statistics import mean, median
 import xml.etree.ElementTree as ET
-from search_algorithms import TreasureState, treasure_minimax, transition
 from .metrics import read_csv, write_csv
+from .aggregate import FAMILIES
 
 
 def fmt(value):
@@ -30,7 +30,7 @@ def write_report(root):
     summary = read_csv(root/'tables/summary.csv')
     cases = read_csv(root/'tables/per_case.csv')
     paired = read_csv(root/'tables/paired_summary.csv')
-    raw = {name:read_csv(root/'raw'/f'{name}.csv') for name in ('maze','weighted','tree','treasure','sensitivity')}
+    raw = {name:read_csv(root/'raw'/f'{name}.csv') for name in FAMILIES}
     total = sum(map(len, raw.values()))
     correct = sum(r['correctness_passed']=='True' for rows in raw.values() for r in rows)
     testfile = root/'raw/pytest.xml'
@@ -101,16 +101,7 @@ def write_report(root):
     for depth in ('2','4'):
         for step,r in enumerate(pv[depth],1):
             variations.append([depth,step,r['player'],r['target'],r['gain'],r['score_a'],r['score_b'],r['score_a']-r['score_b']])
-    # Tabulate every B reply after each A root action, using exact full-window minimax.
-    responses=[]
-    from .cases import VALUES
-    for depth in (2,4):
-        for target in sorted(VALUES):
-            s = transition(TreasureState(),target,matrix,VALUES)
-            for reply in sorted(s.remaining):
-                child = transition(s,reply,matrix,VALUES)
-                result = treasure_minimax(child,depth-2,matrix,VALUES)
-                responses.append({'depth':depth,'a_first':target,'b_reply':reply,'utility':result['best_value']})
+    responses=read_csv(root/'raw/root_responses.csv')
     write_csv(root/'tables/root_responses.csv',responses)
     times=read_csv(root/'raw/routing_times.csv')
     pre=median(float(r['precompute_ms']) for r in times)
@@ -125,7 +116,39 @@ def write_report(root):
     b4heur=one(summary,experiment='tree',branch=4,depth=6,algorithm='heuristic')
     weighted80=one(paired,experiment='weighted',grid_size=80,scenario='base',high_ratio=.4,algorithm='adjusted',reachable='True')
     s80=one(summary,experiment='weighted',grid_size=80,scenario='zero',high_ratio=.4,algorithm='adjusted',reachable='True')
+    ablation=read_csv(root/'tables/ablation_summary.csv')
+    effects=read_csv(root/'tables/ablation_effects.csv')
+    timing=read_csv(root/'tables/treasure_timing_summary.csv')
+    ablation80=[]
+    for h in ('zero','manhattan'):
+        for tie in ('f_h_fifo','f_fifo'):
+            r=one(ablation,grid_size=80,density=0,reachable='True',heuristic=h,tie_breaking=tie)
+            ablation80.append(['h=0' if h=='zero' else 'Manhattan',tie,r['expanded_mean'],r['generated_mean'],
+                               r['max_frontier_mean'],r['wall_ms_mean']])
+    contrasts=[]
+    labels={'heuristic_at_f_h_fifo':'启发式，固定f_h_fifo','heuristic_at_f_fifo':'启发式，固定f_fifo',
+            'tie_at_zero':'同分策略，固定h=0','tie_at_manhattan':'同分策略，固定Manhattan'}
+    for density in (0,.1,.2,.3):
+        for contrast,label in labels.items():
+            r=one(effects,grid_size=80,density=density,reachable='True',contrast=contrast,metric='expanded')
+            contrasts.append([density,label,r['instances'],r['delta_mean'],f"{float(r['reduction_mean']):.1%}",
+                f"[{float(r['reduction_ci_low']):.1%}, {float(r['reduction_ci_high']):.1%}]"])
+    h4timing=select(timing,experiment='treasure',depth=4)
+    timing_rows=[]
+    conclusions={'stable_faster':'稳定更快','slower':'更慢','uncertain':'未见稳定优势'}
+    for r in h4timing:
+        timing_rows.append([r['baseline'],r['candidate'],float(r['baseline_median_ms'])*1000,
+            float(r['candidate_median_ms'])*1000,float(r['paired_median_delta_ms'])*1000,
+            f"[{float(r['paired_delta_ci_low'])*1000:.3f}, {float(r['paired_delta_ci_high'])*1000:.3f}]",
+            f"[{float(r['block_delta_ci_low'])*1000:.3f}, {float(r['block_delta_ci_high'])*1000:.3f}]",
+            f"{float(r['candidate_faster_fraction']):.0%}",conclusions[r['conclusion']]])
+    h4comparison=one(timing,experiment='treasure',depth=4,baseline='original',candidate='heuristic')
+    timing_conclusion=conclusions[h4comparison['conclusion']]
+    fifo80=one(ablation,grid_size=80,density=0,reachable='True',heuristic='manhattan',tie_breaking='f_fifo')
+    hfirst80=one(ablation,grid_size=80,density=0,reachable='True',heuristic='manhattan',tie_breaking='f_h_fifo')
     report = f'''# 当代人工智能实验二：搜索算法
+
+数据批次：`{env['run_id']}`。本文所有时间、统计表和图表均来自本批CSV，文件哈希见 `results/raw/batch_manifest.json`。
 
 ## 摘要
 
@@ -145,7 +168,7 @@ def write_report(root):
 
 状态 s=(row,col)，动作集合为上、下、左、右，越界或 X 无后继。每条合法边代价为1；g(start)=0，g(v)=g(u)+1。启发式 h(s)=|row-row_E|+|col-col_E|，f=g+h。任何四邻接路径至少需要曼哈顿距离这么多步，障碍只能增加必要路程，所以 h 可采纳。相邻格的曼哈顿差至多1，h(u)≤1+h(v)，因此一致。
 
-开放列表用 heapq，条目为 (f,h,递增序号,g,坐标)。同 f 优先较小 h，最后用插入序号稳定消歧；邻居始终按上、下、左、右。所有 h0/启发式对照采用同一规则，但 h 的改变也会改变次级排序值，所以本文比较的是固定排序规则下完整搜索策略的效果。g_score保存目前最优已知代价；只在严格改进时更新父指针并重新入队。弹出的旧g不等于当前g时跳过。目标正式出队后逆向追溯 came_from 并反转，不将目标计入 expanded。无解时队列耗尽，路径为空、内部cost=∞。
+开放列表用heapq。默认f_h_fifo条目为(f,h,seq,g,pos)，同f优先较小h，再按插入顺序；新增f_fifo条目为(f,seq,g,pos)，同f仅按插入顺序。邻居始终按上、下、左、右。基础实验沿用默认策略，独立消融分别控制启发函数和同分策略。g_score保存最优已知代价；严格改进时才更新父指针并入队，弹出旧g时跳过。目标出队后追溯came_from恢复路径，目标不计expanded；无解返回空路径，内部cost=∞。
 
 算法不把首次发现视为最优，也不设置永久禁止重开的 closed 集。若 h 可采纳、h(goal)=0，较优候选路径上必有 f 不大于真正最优代价的前沿节点；因此不可能先取出更贵的目标并结束。重开使这一论证不依赖一致性；一致性则减少重复展开。零权环通过“严格降低g才更新”避免相等代价反复入队。随机测试还用不一致但可采纳的启发式检验更新与过期条目。
 
@@ -180,12 +203,12 @@ Alpha 表示MAX已经保证的下界，Beta表示MIN已经保证的上界。MAX�
 - 迷宫：10/20/40/80方格，障碍概率0/10%/20%/30%，共320张地图。障碍独立采样，仅强制起终点可通行；不筛掉难例、不补抽可达样本。
 - 加权：四种规模，8权概率10%/40%/70%，其余均匀选1或3；额外40%高权配普通0/1/3的零权场景及20%障碍场景，共400张地图。数字地形在非障碍格采样，端点覆盖为S/E。
 - 树：分支2/3/4、深度2/4/6，各20棵，叶值均匀整数[-100,100]，共180棵，输入树生成不计入搜索时间。
-- 每实例每方法预热一次，再测3次；宝藏固定地图及敏感性测30次。随机实例的方法执行顺序按种子固定打乱。输入相同、算法版本和测量边界相同。
+- 基础路径和合成树实验每方法预热一次、测3次，方法顺序按种子打乱。A*消融与宝藏实验先预热2轮，再逐轮交错运行：消融每方法3次，宝藏及价值敏感性每方法30次。每轮用配置编号和轮次派生固定种子打乱方法顺序，原始CSV保存执行位置和完整顺序。
 - runtime_ms为perf_counter记录算法主体，wall_ms包含调用包装和输入检查；图表与表格中“时间”统一使用 wall_ms，排序成本包含其中。先对同实例重复时间取中位数，再跨种子计算均值/标准差。
 - bootstrap对独立实例重采样1000次，种子20261019，以2.5%/97.5%近似分位数估计均值95%区间。方法对比先计算每实例节点减少比例，再对配对比例做bootstrap。重复计时在实例内聚合；固定宝藏的30次重复用于估计计时波动。
 - A* generated包含初始和重新入队；popped包含过期；expanded不含目标；max_frontier为堆条目峰值；stale_pops单独保存。博弈visited包含根和叶；evaluated_leaves仅终止评价；cutoff是实际跳过剩余兄弟的事件；pruned_siblings只是同层跳过数，不能直接当总减少节点数。排序额外探测量为ordering_probes。
 
-原始记录共{total}条（另有30次距离与端到端计时）。`results/raw`保存所有重复数据和环境，`tables/per_case.csv`保存实例中位数，`summary.csv`按配置及可达性分组，`paired_summary.csv`保存配对减少率和区间。不可达实例的最优成本∞不进入有限路径成本均值，节点/时间仍完整保留在不可达分层。整个实验及聚合用时{env['experiment_elapsed_seconds']:.2f}秒，未包含后续绘图和报告生成。
+本批保存{total}条测量，其中A*独立消融{len(raw['maze_ablation'])}条，另存30次距离与端到端计时。`results/raw`保存重复记录和环境，`tables/per_case.csv`保存实例中位数，`summary.csv`按配置和可达性分组。不可达组保留节点与时间统计，成本∞单独处理。数据采集用时{env['experiment_elapsed_seconds']:.2f}秒，聚合、绘图和报告生成在计时外。每条正式测量带run_id，批次清单记录原始文件及派生结果的SHA256。
 
 ## 4. 正确性验证
 
@@ -216,6 +239,20 @@ Alpha 表示MAX已经保证的下界，Beta表示MIN已经保证的上界。MAX�
 空网格中大量格子的f相同。较小h优先使A*沿接近目标的路线前进，h0则按g逐层扩散，因此无障碍大网格中的差异明显。障碍迫使绕行时，曼哈顿距离无法反映墙体结构，搜索仍会进入看似接近目标的死路。不可达实例需要穷尽起点可达区域，通常节省较少，因此与可达实例分开统计。两种方法在所有验证输入上的最优距离一致。
 
 计时包含网格校验。当搜索本身很短时，输入扫描可能占主要时间，因此节点缩减幅度与时间加速幅度并不相同。过期条目、重开和同分排序也会影响开销；原始数据同时保存了路径长度、generated和frontier等指标。
+
+### 5.1 启发函数与tie-breaking的2×2消融
+
+消融复用基础迷宫的规模、障碍率及种子，四种方法在每张地图上逐轮交错执行，并逐次用BFS核对最优距离。80×80空迷宫结果如下，时间为各实例重复中位数的均值：
+
+{table(['启发函数','同分策略','expanded','generated','max_frontier','wall_ms'],ablation80)}
+
+在这张空地图中，所有从左上单调前进的状态都满足f=g+h={fmt(fifo80['optimal_cost_mean'])}，形成大片同分平台。h=0时两种队列都按g逐层扩散，次级h恒为0，计数相同。Manhattan配合f_fifo仍在这个平台上按插入顺序扩散，目标最后出队，扩展{fmt(fifo80['expanded_mean'])}个格子；配合f_h_fifo则优先较小h，沿接近目标的方向推进，只扩展{fmt(hfirst80['expanded_mean'])}次。因此原来的大幅减少率包含了启发函数与同分排序的交互作用，不能全部归于几何下界本身。
+
+下表分别固定同分策略或启发函数，给出80×80可达实例的配对对照。差值为候选减基线，减少率为每实例比例的均值，区间来自种子级bootstrap。其他规模、generated、max_frontier、wall_ms及差分之差保存在 `ablation_contrasts.csv` 和 `ablation_effects.csv`。
+
+{table(['障碍率','受控对照','n','扩展差值','减少率','95%区间'],contrasts)}
+
+![A*同分策略与启发函数消融](../results/figures/maze_ablation.png)
 
 ## 6. 题目二：代价最优与启发式修正
 
@@ -285,6 +322,18 @@ H4中，T3虽然首步收益为负，却通过后续位置和剩余宝藏组合�
 
 计时分解：30次独立测量中，六点距离预计算中位数{pre:.3f}ms；H4默认AB仅博弈调用中位数{float(ab4['wall_ms']):.3f}ms；包含预计算的端到端中位数{end:.3f}ms。各项分别测量，中位数不要求严格可加。固定小博弈上距离计算占有显著成本，单纯优化递归未必明显改变端到端耗时。
 
+### 8.1 交错计时与同轮配对分析
+
+各配置先对四种算法预热两轮，再正式运行30轮。每轮每算法恰好执行一次，顺序按固定种子打乱，避免将整段连续测量中的时序漂移归给某个算法。`measurement_order.csv`和每条原始记录均保存轮次、种子、顺序和执行位置。wall_ms覆盖函数调用、输入检查和内部排序，矩阵计算另行测量。
+
+H=4配对结果如下，单位为微秒。差值是同轮候选时间减基线时间；“两方法中位数之差”另存在CSV，与同轮差值中位数分别记录。
+
+{table(['基线','候选','基线中位数/µs','候选中位数/µs','配对差/µs','配对95%区间','块95%区间','更快轮次','判断'],timing_rows)}
+
+区间采用5000次配对轮次bootstrap；长度3的循环块bootstrap用于检查短期相关性的影响。预先将稳定时间优势定义为两种差值区间上界均低于0，且候选更快的轮次至少占75%。按该规则，H=4的heuristic相对original在本轮为“{timing_conclusion}”：原始访问{fmt(ab4['visited_nodes'])}个节点，排序后{fmt(heur4['visited_nodes'])}个，节点效率提高{1-float(heur4['visited_nodes'])/float(ab4['visited_nodes']):.1%}；时间优势则由本轮配对结果独立判断。重复轮次描述本机固定输入上的计时波动。
+
+![H4交错计时及配对置信区间](../results/figures/treasure_timing.png)
+
 ## 9. 创新与自设拓展
 
 ### 9.1 即时收益排序的成本与收益
@@ -297,7 +346,7 @@ H4原始AB访问{fmt(ab4['visited_nodes'])}个节点，排序后为{fmt(heur4['v
 
 ### 9.2 宝藏价值敏感性
 
-保持地图、T2/T3/T4价值和收益规则不变，仅将T1价值设为0,2,…,18，分别比较H2/H4；每配置两种排序、各30次计时，仍以独立穷举验证。结果如下：
+保持地图、T2/T3/T4价值和收益规则不变，仅将T1价值设为0,2,…,18，分别比较H2/H4。每个配置交错运行完整Minimax与三种Alpha-Beta顺序，各30次，所有值与独立穷举核对。结果如下，全部配置的耗时配对分析见 `treasure_timing_summary.csv`：
 
 {table(['T1价值','H2首步','H2效用','H4首步','H4效用'],sensitivity_rows)}
 
@@ -321,16 +370,17 @@ T1价值同时影响A的抢夺收益和B的反制选择，因此最优效用呈�
 python -m pip install -r requirements.txt
 python -m pytest -q --junitxml=results/raw/pytest.xml
 python -m experiments.run_all
+python -m experiments.audit_results
 ```
 
-`python -m experiments.demo --task 1/2/3/4`分别运行四题（实际参数选一个数字）；`python -m experiments.plot_results`仅从已保存结果重绘；`python -m experiments.write_report`仅更新本报告。quick模式输出到results/quick，不覆盖正式结果或报告。计时每次运行会变化，确定性路径、最优值、节点数、种子和生成策略可复现。
+`python -m experiments.verify_official`独立核对四题样例；`python -m experiments.rebuild_results`从本批原始数据重建统计表、全部图表和报告，不重新计时。quick模式写入results/quick，可用 `python -m experiments.audit_results --quick` 检查。GitHub Actions使用Python3.11执行完整pytest、样例验证、quick实验和输出审计。
 
 ### 交付与评分要求映射
 
 |要求|实现/证据|
 |---|---|
 |代码完整与状态正确|src/search_algorithms，公开四题接口；tests独立基准|
-|性能评估|raw五类CSV、summary/paired_summary及7张PNG/SVG|
+|性能评估|raw六类测量CSV、因素/计时配对统计及9组PNG/SVG|
 |算法与报告分析|第2节理论、第5–8节逐题实测与具体决策解释|
 |创新与拓展|即时收益排序、合成树排序、价值/深度/零权敏感性|
 |第三方复现|README、requirements、pyproject、统一run_all入口|

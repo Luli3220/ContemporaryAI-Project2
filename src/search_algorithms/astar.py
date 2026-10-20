@@ -44,12 +44,15 @@ def astar_search(start: Coord, goal: Coord, shape: tuple[int, int],
                  is_blocked: Callable[[Coord], bool],
                  enter_cost: Callable[[Coord], float],
                  heuristic: Callable[[Coord, Coord], float], *,
-                 stats: AStarStats | None = None) -> PathResult:
+                 stats: AStarStats | None = None,
+                 tie_breaking: str = 'f_h_fifo') -> PathResult:
     """Requires finite nonnegative edge costs and an admissible h with h(goal)=0.
 
     The wrapper validates its complete grid; callbacks are validated as encountered.
     No permanent closed set: admissible inconsistent heuristics can reopen nodes.
     """
+    if tie_breaking not in ('f_h_fifo', 'f_fifo'):
+        raise ValueError('tie_breaking must be f_h_fifo or f_fifo')
     if len(shape) != 2 or any(type(n) is not int or n <= 0 for n in shape):
         raise ValueError('shape must contain two positive integers')
     check_coord(start, shape)
@@ -63,12 +66,16 @@ def astar_search(start: Coord, goal: Coord, shape: tuple[int, int],
     h = heuristic(start, goal)
     if not isfinite(h) or h < 0 or heuristic(goal, goal) != 0:
         raise ValueError('heuristic must be finite, nonnegative and zero at goal')
-    heap = [(h, h, next(serial), 0, start)]
+    def entry(g, h, pos):
+        return ((g + h, h, next(serial), g, pos) if tie_breaking == 'f_h_fifo'
+                else (g + h, next(serial), g, pos))
+
+    heap = [entry(0, h, start)]
     best = {start: 0}
     parent: dict[Coord, Coord] = {}
     st.generated = st.max_frontier = 1
     while heap:
-        _, _, _, g, p = heappop(heap)
+        g, p = heappop(heap)[-2:]
         st.popped += 1
         if g != best[p]:
             st.stale_pops += 1
@@ -93,7 +100,7 @@ def astar_search(start: Coord, goal: Coord, shape: tuple[int, int],
                 if not isfinite(h) or h < 0:
                     raise ValueError('heuristic must be finite and nonnegative')
                 best[q], parent[q] = ng, p
-                heappush(heap, (ng + h, h, next(serial), ng, q))
+                heappush(heap, entry(ng, h, q))
                 st.generated += 1
                 st.max_frontier = max(st.max_frontier, len(heap))
     st.runtime_ms = (perf_counter() - begin) * 1000
@@ -101,7 +108,7 @@ def astar_search(start: Coord, goal: Coord, shape: tuple[int, int],
 
 
 def maze_search(start: Coord, goal: Coord, grid: Grid, *, heuristic: str = 'manhattan',
-                stats: AStarStats | None = None) -> PathResult:
+                stats: AStarStats | None = None, tie_breaking: str = 'f_h_fifo') -> PathResult:
     shape = validate_endpoints(start, goal, grid)
     if any(v not in ('.', 'X', 'S', 'E') for row in grid for v in row):
         raise ValueError('maze allows only . X S E')
@@ -109,7 +116,7 @@ def maze_search(start: Coord, goal: Coord, grid: Grid, *, heuristic: str = 'manh
         raise ValueError('unknown heuristic')
     return astar_search(start, goal, shape, lambda p: grid[p[0]][p[1]] == 'X',
                         lambda p: 1, manhattan if heuristic == 'manhattan' else lambda a, b: 0,
-                        stats=stats)
+                        stats=stats, tie_breaking=tie_breaking)
 
 
 def solve_maze(start: Coord, goal: Coord, grid: list[list[str]]) -> list[Coord]:
@@ -117,7 +124,7 @@ def solve_maze(start: Coord, goal: Coord, grid: list[list[str]]) -> list[Coord]:
 
 
 def weighted_search(start: Coord, goal: Coord, grid: Grid, *, heuristic: str = 'adjusted',
-                    stats: AStarStats | None = None) -> PathResult:
+                    stats: AStarStats | None = None, tie_breaking: str = 'f_h_fifo') -> PathResult:
     shape = validate_endpoints(start, goal, grid)
     numbers = []
     for row in grid:
@@ -136,7 +143,7 @@ def weighted_search(start: Coord, goal: Coord, grid: Grid, *, heuristic: str = '
 
     return astar_search(start, goal, shape, lambda p: grid[p[0]][p[1]] == 'X', cost,
                         lambda a, b: max(manhattan(a, b) - 1, 0) * floor
-                        if heuristic == 'adjusted' else 0, stats=stats)
+                        if heuristic == 'adjusted' else 0, stats=stats, tie_breaking=tie_breaking)
 
 
 def solve_weighted_terrain(start: Coord, goal: Coord, grid: Grid) -> int:

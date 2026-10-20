@@ -10,10 +10,12 @@
 python -m pip install -r requirements.txt
 python -m pytest -q --junitxml=results/raw/pytest.xml
 python -m experiments.demo
+python -m experiments.verify_official
 python -m experiments.run_all
+python -m experiments.audit_results
 ```
 
-`run_all`依次运行课程样例、对照实验、数据聚合、绘图和报告生成。当前测试共419项，全部通过。从仓库直接运行即可；如需在其他目录导入算法，可先执行 `python -m pip install -e .`。
+`run_all`依次运行课程样例、对照实验、数据聚合、绘图、报告生成和批次审计。当前共522项测试。从仓库直接运行即可；如需在其他目录导入算法，可先执行 `python -m pip install -e .`。
 
 正式结果已保存在仓库内，可以直接阅读 [实验报告](report/report.md)。报告会读取JUnit中的测试结果，首次复现时请先运行上面的测试命令。
 
@@ -29,6 +31,7 @@ python -m experiments.run_all
 | 验收与环境限制 | [docs/acceptance.md](docs/acceptance.md) |
 | 官方样例实测结果 | [results/raw/official.json](results/raw/official.json) |
 | 原始记录审计 | [results/raw/audit.json](results/raw/audit.json) |
+| 本轮实验方案与统计判据 | [docs/final_experiment_protocol.md](docs/final_experiment_protocol.md) |
 
 仓库保留Markdown报告、代码、测试、正式实验数据和图表。
 
@@ -62,6 +65,8 @@ cost = solve_weighted_terrain((0, 0), (0, 1), [['S', 'E']])  # 0
 value = alpha_beta(TreeNode(children=[TreeNode(0), TreeNode(-2)]))  # 0
 ```
 
+A*默认使用 `f_h_fifo=(f,h,seq,g,pos)`。可通过 `maze_search(..., tie_breaking='f_fifo')` 改为仅按f和插入顺序排序；`astar_search`和`weighted_search`也支持该关键字。四题原有公开求解接口及默认行为保持不变。
+
 详细路径与统计用 `maze_search/weighted_search` 返回的PathResult。`AStarStats`和`GameStats`可通过stats参数传入；每次调用自动重置。题3支持JSON适配器tree_from_json。题4支持不可变TreasureState、transition，以及可复用距离矩阵的treasure_minimax/treasure_alpha_beta，两者返回best_target/best_value字典。
 
 重要约定：题2进入goal免费，题4关键标签进入成本为1；负权非法；零权安全退化到h=0；默认树访问左到右。合法无解与非法输入分开处理。S/E出现时应与指定坐标匹配，坐标从0开始。完整数学说明与输入扩展见 [技术规格](docs/specification.md)。
@@ -76,7 +81,7 @@ project2/
   data/test_cases/        机器可读官方输入
   results/raw/            每次重复测量CSV、官方JSON、环境、JUnit
   results/tables/         每实例中位数、配置聚合、配对减少率、各B回复
-  results/figures/        7张PNG和对应SVG
+  results/figures/        9组PNG和SVG（含消融及配对计时）
   docs/                   技术规格、原始任务书、数据来源与验收记录
   report/report.md        完整中文实验报告
   scripts/check_repository.py  文件链接、目录清洁与可复现性检查
@@ -87,18 +92,26 @@ project2/
 
 ```powershell
 python -m experiments.run_all --quick
+python -m experiments.audit_results --quick
 python -m experiments.run_all
-python -m experiments.plot_results
-python -m experiments.write_report
+python -m experiments.rebuild_results
 python -m experiments.audit_results
 python scripts/check_repository.py
 ```
 
-quick仅验证实验流水线，使用较少样本并写入results/quick，不覆盖正式数据/报告；该目录由Git忽略，不随仓库提交。正式模式包含320张迷宫、400张加权地图、180棵合成树、H=0..6宝藏搜索及T1价值敏感性。每组20种子0–19；搜索预热后每方法测3次，固定宝藏测30次；跨方法输入配对。全部生成配置保存在CSV，`generate_cases`可复原任何地图。8,520条记录包含算法对照和重复计时，不是8,520个独立实例。
+quick使用较少样本，写入被Git忽略的results/quick，不覆盖正式数据或报告。正式模式保留原来的320张迷宫、400张加权地图、180棵合成树、H=0..6及T1价值配置，并在同一批320张迷宫上增加2×2消融。
 
-先在实例内取重复时间中位数，再跨种子统计；bootstrap使用固定种子20261019、1000次独立实例重采样。不可达实例保留，分层聚合。报告中的时间为包含输入校验的wall_ms；runtime_ms为搜索主体；预计算与端到端另存routing_times.csv。所有方法都计入排序成本。测试、图表、文件写入不计入搜索时间。
+最终批次共13,560条测量：基础路径/树6,480条、宝藏深度840条、价值敏感性2,400条、独立A*消融3,840条。额外30次距离预计算/端到端计时另存。测量行包含算法对照及重复计时，不能视为独立样本数。
 
-CSV保存种子、实例编号、算法配置、搜索计数、时间和正确性结果。environment.json记录运行环境及源码SHA256；完整运行末尾会核对重复计数、跨方法最优值和图表链接，输出audit.json。固定种子可复现路径成本和节点统计，时间会随运行环境变化。
+基础路径与树实验仍为每方法3次。宝藏及T1敏感性实验先预热2轮，再按轮次交错测量4种算法，每种30次；消融也按轮次交错，每方法3次。每轮执行顺序由固定种子派生，记录在measurement_order.csv及原始测量中。wall_ms包含函数调用、输入检查和排序成本，预计算单独统计。
+
+节点统计按实例聚合，并用1000次种子bootstrap估计区间。宝藏计时按同轮配对，提供中位数、差值、时间比，以及5000次配对/循环块bootstrap区间。H4是否稳定更快按预先声明的区间和轮次比例判断，见实验方案。
+
+每次运行生成独立run_id；environment.json保存参数、依赖和源码SHA256，batch_manifest.json将原始数据、表格、图表及报告绑定到同批结果。审计用BFS/Dijkstra/穷举核对最优值，并从原始CSV重算统计、配对差值和执行顺序。`rebuild_results`只从本批原始文件重建所有派生结果，不重新计时。Git按字节保存冻结结果，跨系统检出后仍可验证文件哈希。固定种子可复现路径成本和节点统计，时间会随机器和调度变化。
+
+## Python 3.11 CI与独立复现
+
+[GitHub Actions](.github/workflows/ci.yml)自动安装requirements-repro.txt，运行完整pytest、四题样例、quick实验及输出审计。使用Python3.11在本地执行 `python scripts/reproduce_ci.py`，可在临时目录及全新虚拟环境中重复同样流程；记录保存在docs/local_ci_validation.json。
 
 ## 已知限制
 
