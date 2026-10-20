@@ -1,6 +1,6 @@
 # 当代人工智能 · 实验二：搜索算法
 
-本项目实现迷宫A*、加权地形搜索、Minimax、Alpha-Beta及宝藏对抗博弈，并提供自动测试、对照实验和中文报告。核心算法只依赖Python标准库。
+本项目实现迷宫A*、加权地形搜索、Minimax、Alpha-Beta及宝藏对抗博弈，并提供自动测试和实验复现脚本。核心算法只依赖Python标准库。
 
 ## 快速开始
 
@@ -17,23 +17,22 @@ python -m experiments.audit_results
 
 `run_all`依次运行课程样例、对照实验、数据聚合、绘图、报告生成和批次审计。当前共522项测试。从仓库直接运行即可；如需在其他目录导入算法，可先执行 `python -m pip install -e .`。
 
-正式结果已保存在仓库内，可以直接阅读 [实验报告](report/report.md)。报告会读取JUnit中的测试结果，首次复现时请先运行上面的测试命令。
+实验结果和Markdown参考报告由上述命令在本地生成，不提交到代码仓库。报告会读取JUnit中的测试结果，首次复现时请先运行测试。
+
+正式报告在独立的 `../AI_Project_2/` 目录维护，上一轮最终数据已保存到该目录的 `experiment_data/20261020T032620Z-6b476869/`，后续写作使用这份固定数据。
 
 ## 阅读索引
 
 | 内容 | 入口 |
 |---|---|
 | 完整文件索引 | [INDEX.md](INDEX.md) |
-| 中文实验报告 | [report/report.md](report/report.md) |
 | 课程原始要求 | [实验二要求_new.pdf](实验二要求_new.pdf) |
 | 技术规格与先行测试设计 | [docs/specification.md](docs/specification.md) |
 | 数据来源、实例数与测量口径 | [docs/data_provenance.md](docs/data_provenance.md) |
 | 验收与环境限制 | [docs/acceptance.md](docs/acceptance.md) |
-| 官方样例实测结果 | [results/raw/official.json](results/raw/official.json) |
-| 原始记录审计 | [results/raw/audit.json](results/raw/audit.json) |
 | 本轮实验方案与统计判据 | [docs/final_experiment_protocol.md](docs/final_experiment_protocol.md) |
 
-仓库保留Markdown报告、代码、测试、正式实验数据和图表。
+仓库保留代码、测试、课程输入、实验方案和运行说明。原始记录、统计表、图表、测试输出及报告均作为本地生成产物，由Git忽略。
 
 ## 分题运行
 
@@ -79,13 +78,11 @@ project2/
   tests/                  官方/边界/随机/不变量测试
   experiments/            固定生成、独立BFS/Dijkstra/排列穷举、测量、聚合、图表、报告
   data/test_cases/        机器可读官方输入
-  results/raw/            每次重复测量CSV、官方JSON、环境、JUnit
-  results/tables/         每实例中位数、配置聚合、配对减少率、各B回复
-  results/figures/        9组PNG和SVG（含消融及配对计时）
   docs/                   技术规格、原始任务书、数据来源与验收记录
-  report/report.md        完整中文实验报告
   scripts/check_repository.py  文件链接、目录清洁与可复现性检查
   INDEX.md                分类文件索引
+  results/                本地生成：原始记录、统计表、图表和审计
+  report/report.md        本地生成：数据分析参考稿
 ```
 
 ## 实验复现与图表
@@ -107,7 +104,7 @@ quick使用较少样本，写入被Git忽略的results/quick，不覆盖正式�
 
 节点统计按实例聚合，并用1000次种子bootstrap估计区间。宝藏计时按同轮配对，提供中位数、差值、时间比，以及5000次配对/循环块bootstrap区间。H4是否稳定更快按预先声明的区间和轮次比例判断，见实验方案。
 
-每次运行生成独立run_id；environment.json保存参数、依赖和源码SHA256，batch_manifest.json将原始数据、表格、图表及报告绑定到同批结果。审计用BFS/Dijkstra/穷举核对最优值，并从原始CSV重算统计、配对差值和执行顺序。`rebuild_results`只从本批原始文件重建所有派生结果，不重新计时。Git按字节保存冻结结果，跨系统检出后仍可验证文件哈希。固定种子可复现路径成本和节点统计，时间会随机器和调度变化。
+每次运行生成独立run_id；environment.json保存参数、依赖和源码SHA256，batch_manifest.json将本地原始数据、表格、图表及参考稿绑定到同批结果。审计用BFS/Dijkstra/穷举核对最优值，并从原始CSV重算统计、配对差值和执行顺序。`rebuild_results`使用已有本地数据重建派生结果，不重新计时。固定种子可复现路径成本和节点统计，时间会随机器和调度变化。
 
 ## Python 3.11 CI与独立复现
 

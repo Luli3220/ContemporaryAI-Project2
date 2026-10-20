@@ -1,81 +1,61 @@
-# 实验二文件索引
+# 实验二代码索引
 
-本仓库对应当代人工智能实验二：搜索算法，包含完整代码、522项测试、可复现实验及Markdown报告。
+代码仓库保留算法、测试、课程输入、实验方案和复现工具。实验输出在本地生成；正式报告由独立的 `../AI_Project_2/` 目录维护。
 
 ## 建议阅读顺序
 
 1. [README：环境与运行命令](README.md)
-2. [完整中文实验报告](report/report.md)
+2. [课程要求](实验二要求_new.pdf)
 3. [技术规格与测试设计](docs/specification.md)
-4. [数据来源和13,560条记录的统计口径](docs/data_provenance.md)
-5. [交付验收记录](docs/acceptance.md)与[验证过程说明](docs/validation_notes.md)
+4. [最终实验方案](docs/final_experiment_protocol.md)
+5. [数据来源与统计口径](docs/data_provenance.md)
 
-## 分类导航
+## 算法与测试
 
-| 目录或文件 | 内容与用途 |
+| 文件 | 内容 |
 |---|---|
-| [实验二要求_new.pdf](实验二要求_new.pdf) | 课程原始要求，包含四题定义与评分细则 |
-| [docs/task_requirements.md](docs/task_requirements.md) | 用户提供的完整开发任务书 |
-| [src/search_algorithms](src/search_algorithms) | 通用A*、迷宫/加权包装、Minimax、Alpha-Beta、宝藏状态及指标模型 |
-| [tests](tests) | 官方样例、边界、不变量及独立基准交叉验证 |
-| [experiments/cases.py](experiments/cases.py) | 官方输入与固定种子数据生成器 |
+| [src/search_algorithms/astar.py](src/search_algorithms/astar.py) | 通用A*及迷宫、加权地形入口；支持两种同分策略 |
+| [src/search_algorithms/minimax.py](src/search_algorithms/minimax.py) | 完整Minimax与JSON适配 |
+| [src/search_algorithms/alpha_beta.py](src/search_algorithms/alpha_beta.py) | Alpha-Beta与子节点顺序 |
+| [src/search_algorithms/treasure_game.py](src/search_algorithms/treasure_game.py) | 距离矩阵、不可变状态和宝藏博弈 |
+| [src/search_algorithms/models.py](src/search_algorithms/models.py) | 结果和统计数据结构 |
+| [tests](tests) | 522项官方样例、边界、随机及计时方法测试 |
 | [experiments/references.py](experiments/references.py) | 独立BFS、Dijkstra和动作序列穷举 |
-| [experiments/run_all.py](experiments/run_all.py) | 全部正式实验的统一入口 |
-| [experiments/aggregate.py](experiments/aggregate.py) | 实例中位数、分层聚合与配对bootstrap统计 |
-| [experiments/plot_results.py](experiments/plot_results.py) | 从已有数据生成图表 |
-| [experiments/write_report.py](experiments/write_report.py) | 从正式结果重建Markdown报告 |
-| [experiments/audit_results.py](experiments/audit_results.py) | 源码哈希、最优值、重复测量和图表审计 |
-| [experiments/maze_ablation.py](experiments/maze_ablation.py) | 启发函数×同分策略的2×2消融 |
-| [experiments/analysis.py](experiments/analysis.py) | 因素对照、同轮耗时配对、bootstrap区间 |
-| [experiments/rebuild_results.py](experiments/rebuild_results.py) | 从本批原始数据重建全部表格、图表与报告 |
-| [experiments/verify_official.py](experiments/verify_official.py) | 四题样例与矩阵的独立验收入口 |
-| [docs/final_experiment_protocol.md](docs/final_experiment_protocol.md) | 最终测量方案与稳定时间优势判据 |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | Python3.11完整测试与quick复现 |
-| [scripts/reproduce_ci.py](scripts/reproduce_ci.py) | 本地独立目录和虚拟环境复现CI |
-| [docs/local_ci_validation.json](docs/local_ci_validation.json) | 全新Python3.11虚拟环境的实测验证记录 |
-| [data/test_cases/course.json](data/test_cases/course.json) | 机器可读官方地图与宝藏价值 |
-| [results/raw](results/raw) | 每次实际运行的原始CSV、环境、JUnit、官方结果及审计 |
-| [results/tables](results/tables) | 每实例中位数、配置聚合、配对统计与根动作回复表 |
-| [results/figures](results/figures) | 九组正式PNG及SVG图表 |
-| [scripts/check_repository.py](scripts/check_repository.py) | 目录清洁、Python语法、Markdown链接及正式数据审计 |
-| [requirements.txt](requirements.txt) | 安装所需依赖范围 |
-| [requirements-repro.txt](requirements-repro.txt) | 交付实测采用的直接依赖精确版本 |
-| [pyproject.toml](pyproject.toml) | 包安装和pytest搜索路径配置 |
 
-## 原始结果入口
+## 实验与复现
 
-| 文件 | 含义 |
+| 文件 | 内容 |
 |---|---|
-| [official.json](results/raw/official.json) | 四题官方样例、实际路径与距离矩阵 |
-| [maze.csv](results/raw/maze.csv) | 迷宫两种启发式，1,920条测量 |
-| [weighted.csv](results/raw/weighted.csv) | 加权地形两种启发式，2,400条测量 |
-| [tree.csv](results/raw/tree.csv) | 完整Minimax与三种Alpha-Beta顺序，2,160条测量 |
-| [treasure.csv](results/raw/treasure.csv) | 固定宝藏H=0..6，840条测量 |
-| [sensitivity.csv](results/raw/sensitivity.csv) | T1价值敏感性，2,400条交错测量 |
-| [maze_ablation.csv](results/raw/maze_ablation.csv) | 独立2×2消融，3,840条测量 |
-| [measurement_order.csv](results/raw/measurement_order.csv) | 各配置各轮的种子与执行顺序 |
-| [routing_times.csv](results/raw/routing_times.csv) | 另存的30次预计算/端到端计时 |
-| [root_actions.csv](results/raw/root_actions.csv) | 各深度各首步的精确对抗评价 |
-| [principal_variations.json](results/raw/principal_variations.json) | H2/H4的一条最优对抗轨迹 |
-| [environment.json](results/raw/environment.json) | 运行环境、参数、种子和源文件SHA256 |
-| [pytest.xml](results/raw/pytest.xml) | 实际执行的JUnit测试记录 |
-| [audit.json](results/raw/audit.json) | 正式原始结果审计结论 |
-| [batch_manifest.json](results/raw/batch_manifest.json) | 本批所有原始与派生文件的SHA256 |
-| [ablation_effects.csv](results/tables/ablation_effects.csv) | 固定因素对照和交互作用的区间 |
-| [treasure_timing_summary.csv](results/tables/treasure_timing_summary.csv) | 原始/反向/启发式的同轮配对计时统计 |
+| [experiments/cases.py](experiments/cases.py) | 课程输入与固定种子生成器 |
+| [data/test_cases/course.json](data/test_cases/course.json) | 机器可读课程地图及宝藏价值 |
+| [experiments/run_all.py](experiments/run_all.py) | 正式与快速实验的统一入口 |
+| [experiments/maze_ablation.py](experiments/maze_ablation.py) | 启发函数×同分策略的2×2消融 |
+| [experiments/treasure_experiments.py](experiments/treasure_experiments.py) | 宝藏深度、价值及交错计时 |
+| [experiments/metrics.py](experiments/metrics.py) | 测量边界、预热和确定性执行顺序 |
+| [experiments/aggregate.py](experiments/aggregate.py) | 实例中位数和分层聚合 |
+| [experiments/analysis.py](experiments/analysis.py) | 因素对照、同轮配对与bootstrap区间 |
+| [experiments/batch.py](experiments/batch.py) | 数据批次与文件哈希 |
+| [experiments/rebuild_results.py](experiments/rebuild_results.py) | 从已有本地记录重建派生结果 |
+| [experiments/plot_results.py](experiments/plot_results.py) | 生成九组图表 |
+| [experiments/write_report.py](experiments/write_report.py) | 生成本地数据分析参考稿 |
+| [experiments/audit_results.py](experiments/audit_results.py) | 核对源码、最优值、统计、顺序和文件哈希 |
+| [experiments/verify_official.py](experiments/verify_official.py) | 四题课程样例与矩阵验收 |
+| [scripts/reproduce_ci.py](scripts/reproduce_ci.py) | 独立目录及Python3.11虚拟环境复现 |
+| [scripts/check_repository.py](scripts/check_repository.py) | 目录、语法、链接和实验审计 |
+| [.github/workflows/ci.yml](.github/workflows/ci.yml) | GitHub Actions验证流程 |
 
-## 正式图表
+## 文档与环境
 
-| 研究问题 | PNG | SVG |
-|---|---|---|
-| 迷宫规模与扩展数 | [预览](results/figures/maze_scaling.png) | [矢量](results/figures/maze_scaling.svg) |
-| 加权地形与启发式 | [预览](results/figures/weighted_scaling.png) | [矢量](results/figures/weighted_scaling.svg) |
-| 官方加权路径 | [预览](results/figures/weighted_path.png) | [矢量](results/figures/weighted_path.svg) |
-| 博弈树规模与顺序 | [预览](results/figures/tree_scaling.png) | [矢量](results/figures/tree_scaling.svg) |
-| H2/H4根动作评价 | [预览](results/figures/root_actions.png) | [矢量](results/figures/root_actions.svg) |
-| 宝藏搜索开销 | [预览](results/figures/treasure_search.png) | [矢量](results/figures/treasure_search.svg) |
-| T1价值敏感性 | [预览](results/figures/sensitivity.png) | [矢量](results/figures/sensitivity.svg) |
-| A*2×2消融 | [预览](results/figures/maze_ablation.png) | [矢量](results/figures/maze_ablation.svg) |
-| H4配对计时区间 | [预览](results/figures/treasure_timing.png) | [矢量](results/figures/treasure_timing.svg) |
+- [接口与先行测试规格](docs/specification.md)
+- [本轮测量方案及判据](docs/final_experiment_protocol.md)
+- [数据来源](docs/data_provenance.md)
+- [验收说明](docs/acceptance.md)
+- [测试与复现说明](docs/validation_notes.md)
+- [原始开发任务书](docs/task_requirements.md)
+- [依赖范围](requirements.txt)、[固定依赖版本](requirements-repro.txt)、[包与pytest配置](pyproject.toml)
 
-正式数据不包含快速模式输出、缓存、LaTeX源文件、编译产物或旧版归档。
+## 本地产物
+
+运行实验后，`results/raw/`、`results/tables/`、`results/figures/`分别保存记录、统计和图表，`report/report.md`保存数据分析参考稿。这些目录及`docs/local_ci_validation.json`由Git忽略，不随代码提交。
+
+用于报告写作的最终批次为`20261020T032620Z-6b476869`，完整快照和索引保存在独立报告目录的`experiment_data/`与`EXPERIMENT_INDEX.md`中。

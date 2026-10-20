@@ -4,10 +4,9 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
-results/quick/
-report/overleaf/
-report/latex_qa/
-report/archive/
+/results/
+/report/
+/docs/local_ci_validation.json
 *.aux
 *.log
 *.out
