@@ -1,6 +1,6 @@
 # 最终交付验收
 
-代码与报告分开维护：本仓库跟踪算法、测试、输入与复现工具，`results/`和`report/`由本地命令生成。用于写作的最终批次保存在独立目录`../AI_Project_2/experiment_data/20261020T032620Z-6b476869/`，入口为该目录的`EXPERIMENT_INDEX.md`。
+代码与报告分开维护：本仓库跟踪算法、测试、输入与复现工具，`results/`和`report/`由本地命令生成。用于写作的最终批次保存在`../AI_Project_2/experiment_data/20261020T032620Z-6b476869/`，报告数据索引为`../AI_Project_2/EXPERIMENT_INDEX.md`。
 
 ## 已交付
 
