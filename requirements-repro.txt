@@ -1,0 +1,4 @@
+# Direct package versions used for the delivered full run; Python 3.11.5.
+pytest==8.4.2
+matplotlib==3.10.6
+numpy==1.26.4

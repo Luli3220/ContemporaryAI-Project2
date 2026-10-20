@@ -1,0 +1,17 @@
+{
+  "measurement_counts": {
+    "maze": 1920,
+    "weighted": 2400,
+    "tree": 2160,
+    "treasure": 840,
+    "sensitivity": 1200
+  },
+  "total_measurements": 8520,
+  "deterministic_repeats": true,
+  "method_optima_equal": true,
+  "all_figure_links_exist": true,
+  "source_hashes_verified": true,
+  "png_count": 7,
+  "svg_count": 7,
+  "status": "passed"
+}
